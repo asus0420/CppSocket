@@ -4,6 +4,12 @@
 #include <WinSock2.h>
 #include<stdio.h>
 
+struct  DataPackage
+{
+	int age;
+	char name[32];
+};
+
 int main()
 {
 	//creatre version number
@@ -62,22 +68,19 @@ int main()
 			printf("客户端已退出，任务结束\n");
 			break;
 		}
-		if ( 0 == strcmp(_revMsg,"getName"))
+		if ( 0 == strcmp(_revMsg,"getInfo"))
 		{
-			printf("接收到命令:getName\n");
-			send(_accSock, "牟文", 20, 0);
-		}
-		else if (0 == strcmp(_revMsg,"getAge"))
-		{
-			printf("接收到命令:getAge\n");
-			send(_accSock, "23", 20, 0);
+			printf("%s发出命令:getInfo\n", inet_ntoa(_csin.sin_addr));
+			DataPackage dp = { 23, "牟文" };
+			send(_accSock, (const char*)&dp,sizeof(DataPackage), 0);
 		}
 		else
 		{
 			//5.send 向客户端发送一条数据
 			//char  msg[] = "Hello , I'm Server.";
-			printf("接收到命令:%s\n",_revMsg);
-			send(_accSock, msg, strlen(msg) + 1, 0);
+			printf("%s发出命令:%s\n",inet_ntoa(_csin.sin_addr),_revMsg);
+			DataPackage dp_1 = { 0, "未知" };
+			send(_accSock, (const char *)&dp_1, strlen(msg) + 1, 0);
 		}
 	}
 	
