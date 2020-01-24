@@ -5,6 +5,12 @@
 #include <iostream>
 using namespace std;
 
+struct  DataPackage
+{
+	int age;
+	char name[32];
+};
+
 
 int main()
 {
@@ -54,7 +60,8 @@ int main()
 		int rev = recv(_sock, _tips, 128, 0);
 		if (rev > 0)
 		{
-			printf("接收到数据：%s \n", _tips);
+			DataPackage *dp = (DataPackage *)_tips;
+			printf("接收到数据：年龄 = %d , 姓名 = %s \n", dp->age,dp->name);
 		}
 		else
 		{
