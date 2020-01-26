@@ -4,12 +4,62 @@
 #include <WinSock2.h>
 #include<stdio.h>
 
-struct  DataPackage
+//命令枚举
+enum Operate
 {
-	int age;
-	char name[32];
+	Server_Login,
+	Server_Login_Result,
+	Server_Logout,
+	Server_Logout_Result,
+	Server_Error,
 };
 
+struct DataHeader
+{
+	int headerLen;//包头：数据长度
+	int operate; //操作
+};
+//登录成功
+struct Login :public DataHeader
+{
+	Login()
+	{
+		headerLen = sizeof(Login);
+		operate = Server_Login;
+	}
+	char userName[32];
+	char passWord[32];
+};
+struct LoginResult :public DataHeader
+{
+	LoginResult()
+	{
+		headerLen = sizeof(LoginResult);
+		operate = Server_Login_Result;
+		result = 0;
+	}
+	int result;
+};
+//登录失败
+struct LogOut :public DataHeader
+{
+	LogOut()
+	{
+		headerLen = sizeof(LogOut);
+		operate = Server_Logout;
+	}
+	char userName[32];
+};
+struct LogOutResult :public DataHeader
+{
+	LogOutResult()
+	{
+		headerLen = sizeof(LogOutResult);
+		operate = Server_Logout_Result;
+		result = 0;
+	}
+	int result;
+};
 int main()
 {
 	//creatre version number
@@ -38,8 +88,6 @@ int main()
 	}else{
 		printf("绑定端口成功...\n");
 	}
-
-
 	//3.listen 监听网络端口
 	if (SOCKET_ERROR == listen(_sock,5)){
 		printf("监听端口失败...\n");
@@ -51,40 +99,56 @@ int main()
 	sockaddr_in _csin = {};//初始化，客户端套接字地址
 	int _csockaddrlen = sizeof(sockaddr_in);//返回客户端的套接字的长度
 	SOCKET _accSock = INVALID_SOCKET; //令为无效套接字
-	char  msg[] = "你说啥呐？\n";
 	_accSock = accept(_sock, (sockaddr *)&_csin, &_csockaddrlen);
 	if (INVALID_SOCKET == _accSock)
 	{
 		printf("错误，接收到无效客户端\n");
 	}
 	printf("新的客户端加入 IP = %s\n", inet_ntoa(_csin.sin_addr));
-	char _revMsg[128] = {};
+
 	//循环接受客户端的消息
 	while (true)
 	{
-		int _res = recv(_accSock, _revMsg, 128, 0);
+		DataHeader header = {};
+		int _res = recv(_accSock, (char *)&header, sizeof(DataHeader), 0);
 		if (_res <= 0)
 		{
 			printf("客户端已退出，任务结束\n");
 			break;
 		}
-		if ( 0 == strcmp(_revMsg,"getInfo"))
+		switch (header.operate)
 		{
-			printf("%s发出命令:getInfo\n", inet_ntoa(_csin.sin_addr));
-			DataPackage dp = { 23, "牟文" };
-			send(_accSock, (const char*)&dp,sizeof(DataPackage), 0);
+			//登录命令
+		case Server_Login:
+		{
+							 Login _lgin = {};
+							 recv(_accSock, (char *)&_lgin + sizeof(DataHeader), sizeof(Login)-sizeof(DataHeader), 0);
+							 //先省略密码判断的过程
+							 LoginResult _inRes;
+							 send(_accSock, (const char *)&_inRes, sizeof(LoginResult), 0);
+							 printf("收到命令：登录 , 命令长度：%d  ,用户名:%s ,密码:%s \n", _lgin.headerLen,_lgin.userName,_lgin.passWord);
 		}
-		else
+		
+			break;
+		case  Server_Logout:
 		{
-			//5.send 向客户端发送一条数据
-			//char  msg[] = "Hello , I'm Server.";
-			printf("%s发出命令:%s\n",inet_ntoa(_csin.sin_addr),_revMsg);
-			DataPackage dp_1 = { 0, "未知" };
-			send(_accSock, (const char *)&dp_1, strlen(msg) + 1, 0);
+							   LogOut 	_lgout = {};
+							   recv(_accSock, (char *)&_lgout + sizeof(DataHeader), sizeof(LogOut)-sizeof(DataHeader), 0);
+							   LogOutResult _outRes;
+							   send(_accSock, (const char *)&_outRes, sizeof(LogOutResult), 0);
+							   printf("收到命令：登出 , 命令长度：%d  ,用户名:%s \n", _lgout.headerLen, _lgout.userName);
+		}
+			break;
+		default:
+		{
+				   header.operate = Server_Error;
+				   header.headerLen = 0;
+				   send(_accSock, (const char *)&header, sizeof(DataHeader), 0);
+		}
+			break;
 		}
 	}
 	
-
 	//6.closesockt 关闭sockt
 	closesocket(_sock);
 
