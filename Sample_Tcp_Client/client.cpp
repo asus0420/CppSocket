@@ -1,4 +1,5 @@
 #define  WIN32_LEAN_AND_MEAN
+#define  NO_RECEIVE -1
 
 #include <windows.h>
 #include <WinSock2.h>
@@ -12,6 +13,7 @@ enum Operate
 	Server_Login_Result,
 	Server_Logout,
 	Server_Logout_Result,
+	Server_New_User_Join,
 	Server_Error,
 };
 
@@ -61,6 +63,54 @@ struct LogOutResult :public DataHeader
 	}
 	int result;
 };
+struct NewUerJoin :public DataHeader
+{
+	NewUerJoin ()
+	{
+		headerLen = sizeof( NewUerJoin );
+		operate = Server_New_User_Join;
+		sock = 0;
+	}
+	int sock;
+};
+
+int process_handle ( SOCKET _sock )
+{
+	char recvbuffer [1024] = { };
+	int _res_recv = recv ( _sock , recvbuffer , sizeof( DataHeader ) , 0 );
+	DataHeader* header = ( DataHeader* ) recvbuffer;
+	if ( _res_recv <= 0 )
+	{
+		cout << "服务器未响应" << endl;
+		return NO_RECEIVE;
+	}
+	switch ( header->operate )
+	{
+		case Server_Login_Result:
+		{
+									recv ( _sock , recvbuffer + sizeof( DataHeader ) , header->headerLen - sizeof( DataHeader ) , 0 );
+									LoginResult	  *_inRes = ( LoginResult * ) recvbuffer;
+									cout << "收到服务器应答：Server_Login_Result" << "应答长度为：" << _inRes->headerLen << endl;
+		}
+			break;
+		case Server_Logout_Result:
+		{
+									 recv ( _sock , recvbuffer + sizeof( DataHeader ) , header->headerLen - sizeof( DataHeader ) , 0 );
+									 LogOutResult	  *_outRes = ( LogOutResult * ) recvbuffer;
+									 cout << "收到服务器应答：Server_Logout_Result" << "应答长度为：" << _outRes->headerLen <<endl;
+		}
+			break;
+		case Server_New_User_Join:
+		{
+									 recv ( _sock , recvbuffer + sizeof( DataHeader ) , header->headerLen - sizeof( DataHeader ) , 0 );
+									 NewUerJoin	  *_nuj = ( NewUerJoin * ) recvbuffer;
+									 //cout << "收到服务器应答：Server_New_User_Join" << "应答长度为：" << _nuj->headerLen << endl;
+									 cout << _nuj->sock << "加入了服务器" << endl;
+		}
+			break;
+	}
+	return 1;
+}
 
 
 int main()
@@ -94,42 +144,24 @@ int main()
 
 	while (true)
 	{
-		char _cmdMsg[128] = {};
-		cin >> _cmdMsg;
-		if (0 == strcmp(_cmdMsg,"exit"))
+		fd_set _fds_read;
+		FD_ZERO ( &_fds_read );
+		FD_SET ( _sock , &_fds_read );
+		int _res_select  = select ( _sock , &_fds_read , nullptr , nullptr , nullptr );
+		if (_res_select < 0)
 		{
-			printf("客户端执行exit,客户端退出\n");
-			break; 
+			printf ( "select任务已经结束\n" );
+			break;
 		}
-		else if ( 0 == strcmp(_cmdMsg,"login"))
+		if ( FD_ISSET ( _sock , &_fds_read ) )
 		{
-			Login  _lgin;
-			strcpy_s(_lgin.userName, "asus0420");
-			strcpy_s(_lgin.passWord, "mw970420");
-			//发送数据
-			send(_sock, (const char *)&_lgin, sizeof(_lgin), 0);
-			//接受服务端返回的数据
-			LoginResult _lgRes = {};
-			recv(_sock, (char *)&_lgRes, sizeof(_lgRes), 0);
-			printf("接收到的数据:%d \n", _lgRes.result);
-
+			FD_CLR ( _sock , &_fds_read );
+			if ( NO_RECEIVE == process_handle ( _sock ) )
+			{
+					  break;
+			}
 		}
-		else if (0 == strcmp(_cmdMsg,"logout"))
-		{
-			LogOut _lgout;
-			strcpy_s(_lgout.userName, "asus0420");
-			//发送数据
-			send(_sock, (const char *)&_lgout, sizeof(_lgout), 0);
-
-			//接受服务器的返回的数据
-			LogOutResult _lgoutRes = {};
-			recv(_sock, (char *)&_lgoutRes, sizeof(_lgoutRes), 0);
-			printf("接收到的数据:%d  \n", _lgoutRes.result);
-		}
-		else
-		{
-			printf("该命令不支持，请重新输入...\n");
-		}
+		
 	}
 
 	
@@ -140,3 +172,44 @@ int main()
 	getchar();
 	return 0;
 }
+
+
+
+/*
+char _cmdMsg[128] = {};
+cin >> _cmdMsg;
+if (0 == strcmp(_cmdMsg,"exit"))
+{
+printf("客户端执行exit,客户端退出\n");
+break;
+}
+else if ( 0 == strcmp(_cmdMsg,"login"))
+{
+Login  _lgin;
+strcpy_s(_lgin.userName, "asus0420");
+strcpy_s(_lgin.passWord, "mw970420");
+//发送数据
+send(_sock, (const char *)&_lgin, sizeof(_lgin), 0);
+//接受服务端返回的数据
+LoginResult _lgRes = {};
+recv(_sock, (char *)&_lgRes, sizeof(_lgRes), 0);
+printf("接收到的数据:%d \n", _lgRes.result);
+
+}
+else if (0 == strcmp(_cmdMsg,"logout"))
+{
+LogOut _lgout;
+strcpy_s(_lgout.userName, "asus0420");
+//发送数据
+send(_sock, (const char *)&_lgout, sizeof(_lgout), 0);
+
+//接受服务器的返回的数据
+LogOutResult _lgoutRes = {};
+recv(_sock, (char *)&_lgoutRes, sizeof(_lgoutRes), 0);
+printf("接收到的数据:%d  \n", _lgoutRes.result);
+}
+else
+{
+printf("该命令不支持，请重新输入...\n");
+}
+*/
