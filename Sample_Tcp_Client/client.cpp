@@ -1,68 +1,84 @@
-#define  WIN32_LEAN_AND_MEAN
-#define  NO_RECEIVE -1
+#define NO_RECEIVE                  (-1)
 
-#include <windows.h>
-#include <WinSock2.h>
-#include <iostream>
+#ifdef _WIN32
+	#define  WIN32_LEAN_AND_MEAN
+	#define WINSOCK_DEPRECATED_NO_WARNING
+	#include <windows.h>
+	#include <WinSock2.h>
+#else
+	#include <unistd.h>
+	#include <arpa/inet.h>
+	#include <string.h>
+
+#define  SOCKET				int
+#define  SOCKET_ERROR						   (-1)
+#define  INVALID_SOCKET   SOCKET(~0)
+#endif
+
+#include<iostream>
+#include <thread>
 using namespace std;
 
-//ÃüÁîÃ¶¾Ù
+//æšä¸¾--å‘½ä»¤
 enum Operate
 {
-	Server_Login,
-	Server_Login_Result,
-	Server_Logout,
-	Server_Logout_Result,
-	Server_New_User_Join,
-	Server_Error,
+	Server_Login ,
+	Server_Login_Result ,
+	Server_Logout ,
+	Server_Logout_Result ,
+	Server_New_User_Join ,
+	Server_Error ,
 };
-
+//æ•°æ®å¤´
 struct DataHeader
 {
-	int headerLen;//°üÍ·£ºÊı¾İ³¤¶È
-	int operate; //²Ù×÷
+	int headerLen;//åŒ…å¤´ï¼šæ•°æ®é•¿åº¦
+	int operate; //æ“ä½œ
 };
-//µÇÂ¼³É¹¦
+//ç™»å½•
 struct Login :public DataHeader
 {
-	Login()
+	Login ()
 	{
-		headerLen = sizeof(Login);
+		headerLen = sizeof( Login );
 		operate = Server_Login;
 	}
-	char userName[32];
-	char passWord[32];
+	char userName [32];
+	char passWord [32];
 };
+//ç™»å½•ç»“æœ
 struct LoginResult :public DataHeader
 {
-	LoginResult()
+	LoginResult ()
 	{
-		headerLen = sizeof(LoginResult);
+		headerLen = sizeof( LoginResult );
 		operate = Server_Login_Result;
 		result = 0;
 	}
 	int result;
 };
-//µÇÂ¼Ê§°Ü
+//ç™»å‡º
 struct LogOut :public DataHeader
 {
-	LogOut()
+	LogOut ()
 	{
-		headerLen = sizeof(LogOut);
+		headerLen = sizeof( LogOut );
 		operate = Server_Logout;
 	}
-	char userName[32];
+	char userName [32];
 };
+//ç™»å‡ºç»“æœ
 struct LogOutResult :public DataHeader
 {
-	LogOutResult()
+	LogOutResult ()
 	{
-		headerLen = sizeof(LogOutResult);
+		headerLen = sizeof( LogOutResult );
 		operate = Server_Logout_Result;
 		result = 0;
 	}
 	int result;
 };
+//æ–°ç”¨æˆ·åŠ å…¥
 struct NewUerJoin :public DataHeader
 {
 	NewUerJoin ()
@@ -74,142 +90,156 @@ struct NewUerJoin :public DataHeader
 	int sock;
 };
 
+
 int process_handle ( SOCKET _sock )
 {
-	char recvbuffer [1024] = { };
-	int _res_recv = recv ( _sock , recvbuffer , sizeof( DataHeader ) , 0 );
-	DataHeader* header = ( DataHeader* ) recvbuffer;
-	if ( _res_recv <= 0 )
+	char recvBuf [1024];
+	int res_recv = (int)recv ( _sock , recvBuf , sizeof( DataHeader ) , 0 );
+	if (res_recv <= 0)
 	{
-		cout << "·şÎñÆ÷Î´ÏìÓ¦" << endl;
+		cout << "æœåŠ¡å™¨æœªå“åº”" << endl;
 		return NO_RECEIVE;
 	}
+	DataHeader * header = ( DataHeader* ) recvBuf;
 	switch ( header->operate )
 	{
 		case Server_Login_Result:
 		{
-									recv ( _sock , recvbuffer + sizeof( DataHeader ) , header->headerLen - sizeof( DataHeader ) , 0 );
-									LoginResult	  *_inRes = ( LoginResult * ) recvbuffer;
-									cout << "ÊÕµ½·şÎñÆ÷Ó¦´ğ£ºServer_Login_Result" << "Ó¦´ğ³¤¶ÈÎª£º" << _inRes->headerLen << endl;
+									recv ( _sock , recvBuf + sizeof( DataHeader ) , header->headerLen - sizeof( DataHeader ) , 0 );
+									LoginResult * login = ( LoginResult * ) recvBuf;
+									cout << "æ”¶åˆ°å‘½ä»¤ï¼šServer_Login_Resultï¼Œæ•°æ®é•¿åº¦ï¼š" << login->headerLen << endl;
 		}
 			break;
 		case Server_Logout_Result:
 		{
-									 recv ( _sock , recvbuffer + sizeof( DataHeader ) , header->headerLen - sizeof( DataHeader ) , 0 );
-									 LogOutResult	  *_outRes = ( LogOutResult * ) recvbuffer;
-									 cout << "ÊÕµ½·şÎñÆ÷Ó¦´ğ£ºServer_Logout_Result" << "Ó¦´ğ³¤¶ÈÎª£º" << _outRes->headerLen <<endl;
+									 recv ( _sock , recvBuf + sizeof( DataHeader ) , header->headerLen - sizeof( DataHeader ) , 0 );
+									 LogOutResult * logout = ( LogOutResult * ) recvBuf;
+									 cout << "æ”¶åˆ°å‘½ä»¤ï¼šServer_Logout_Resultï¼Œæ•°æ®é•¿åº¦ï¼š" << logout->headerLen << endl;
 		}
 			break;
 		case Server_New_User_Join:
 		{
-									 recv ( _sock , recvbuffer + sizeof( DataHeader ) , header->headerLen - sizeof( DataHeader ) , 0 );
-									 NewUerJoin	  *_nuj = ( NewUerJoin * ) recvbuffer;
-									 //cout << "ÊÕµ½·şÎñÆ÷Ó¦´ğ£ºServer_New_User_Join" << "Ó¦´ğ³¤¶ÈÎª£º" << _nuj->headerLen << endl;
-									 cout << _nuj->sock << "¼ÓÈëÁË·şÎñÆ÷" << endl;
+									 recv ( _sock , recvBuf + sizeof( DataHeader ) , header->headerLen - sizeof( DataHeader ) , 0 );
+									 NewUerJoin *nuj = ( NewUerJoin * ) recvBuf;
+									 cout << "æ”¶åˆ°å‘½ä»¤ï¼šServer_New_User_Joinï¼Œæ•°æ®é•¿åº¦ï¼š" << nuj->headerLen << endl;
 		}
 			break;
 	}
-	return 1;
-}
-
-
-int main()
-{
-	//creatre version number
-	WORD ver = MAKEWORD(2, 2);
-	WSADATA data;
-	//¿ªÆô
-	WSAStartup(ver, &data);
-	//1.socket
-	SOCKET _sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (INVALID_SOCKET == _sock)
-	{
-		printf("´´½¨Ì×½Ó×ÖÊ§°Ü\n");
-	}else{
-		printf("´´½¨Ì×½Ó×Ö³É¹¦\n");
-	}
-	//2.connect
-	sockaddr_in _sin = {};
-	_sin.sin_family = AF_INET;
-	_sin.sin_port = htons(4567); // host to net unsigned short
-	_sin.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
-	int cnt = connect(_sock, (sockaddr *)&_sin, sizeof(sockaddr_in));
-	if (SOCKET_ERROR == cnt)
-	{
-		printf("Á¬½ÓÊ§°Ü\n");
-	}
-	else{
-		printf("Á¬½Ó³É¹¦\n");
-	}
-
-	while (true)
-	{
-		fd_set _fds_read;
-		FD_ZERO ( &_fds_read );
-		FD_SET ( _sock , &_fds_read );
-		int _res_select  = select ( _sock , &_fds_read , nullptr , nullptr , nullptr );
-		if (_res_select < 0)
-		{
-			printf ( "selectÈÎÎñÒÑ¾­½áÊø\n" );
-			break;
-		}
-		if ( FD_ISSET ( _sock , &_fds_read ) )
-		{
-			FD_CLR ( _sock , &_fds_read );
-			if ( NO_RECEIVE == process_handle ( _sock ) )
-			{
-					  break;
-			}
-		}
-		
-	}
-
-	
-	//4.closesocket
-	closesocket(_sock);
-	WSACleanup();
-	printf("¿Í»§¶ËÍË³ö\n");
-	getchar();
 	return 0;
 }
 
+bool is_run_client = true;
+void thread_command ( SOCKET _sock )
+{
+	while (true)
+	{
+		char sendMsg [256] = { };
+		cin >> sendMsg;
+		if ( 0 == strcmp ( sendMsg , "exit" ) )
+		{
+			is_run_client = false;
+			cout << "çº¿ç¨‹é€€å‡ºï¼Œä»»åŠ¡ç»“æŸ" << endl;
+			  break;
+		}
+		else  if (0 == strcmp(sendMsg,"login"))
+		{
+			Login login = { };
+#ifdef _WIN32
+			strcpy_s ( login.userName , "moonlink" );
+			strcpy_s(login.passWord,"www.moonlink.club");
+#else
+			strcpy ( login.userName , "moonlink" );
+			strcpy ( login.passWord , "www.moonlink.club" );
+#endif 
+			send ( _sock , ( const char * ) &login , sizeof( login ) , 0 );
+			cout << "å‘é€ç™»é™†å‘½ä»¤" << endl;
+		}
+		else if (0 == strcmp(sendMsg,"logout"))
+		{
+			LogOut logout;
+#ifdef _WIN32
+			strcpy_s ( logout.userName , "moonlink" );
+#else
+			strcpy ( logout.userName , "moonlink" );
+#endif
+			send ( _sock , ( const char * ) &logout , sizeof( logout ) , 0 );
+			cout << "å‘é€ç™»å‡ºå‘½ä»¤" << endl;
+		}
+		else
+		{
+			cout << "å‘½ä»¤è¾“å…¥æœ‰è¯¯ï¼Œè¯·é‡æ–°è¾“å…¥" << endl;
+		}
+	}
+	
+}
 
 
-/*
-char _cmdMsg[128] = {};
-cin >> _cmdMsg;
-if (0 == strcmp(_cmdMsg,"exit"))
+int main ()
 {
-printf("¿Í»§¶ËÖ´ĞĞexit,¿Í»§¶ËÍË³ö\n");
-break;
-}
-else if ( 0 == strcmp(_cmdMsg,"login"))
-{
-Login  _lgin;
-strcpy_s(_lgin.userName, "asus0420");
-strcpy_s(_lgin.passWord, "mw970420");
-//·¢ËÍÊı¾İ
-send(_sock, (const char *)&_lgin, sizeof(_lgin), 0);
-//½ÓÊÜ·şÎñ¶Ë·µ»ØµÄÊı¾İ
-LoginResult _lgRes = {};
-recv(_sock, (char *)&_lgRes, sizeof(_lgRes), 0);
-printf("½ÓÊÕµ½µÄÊı¾İ:%d \n", _lgRes.result);
+#ifdef _WIN32
+	WORD ver = MAKEWORD ( 2 , 2 );
+	WSADATA dat;
+	WSAStartup ( ver , &dat );
+#endif
+	//1.socket åˆ›å»ºsocket
+	SOCKET sock = socket ( AF_INET , SOCK_STREAM , 0 );
+	if (INVALID_SOCKET == sock)
+	{
+		cout << "å¥—æ¥å­—åˆ›å»ºå¤±è´¥..." << endl;
+	}
+	else
+	{
+		cout << "å¥—æ¥å­—åˆ›å»ºæˆåŠŸ..." << endl;
+	}
+	//2.connect
+	sockaddr_in s_addr_in = { };
+	s_addr_in.sin_family = AF_INET;
+	s_addr_in.sin_port = htons ( 4567 );
+#ifdef _WIN32
+	s_addr_in.sin_addr.S_un.S_addr = inet_addr ( "127.0.0.1" );
+#else
+	s_addr_in.sin_addr.s_addr = inet_addr("127.0.0.1");
+#endif
+	int res_con = (int)connect ( sock , ( const sockaddr * )& s_addr_in , sizeof( s_addr_in ) );
+	if ( SOCKET_ERROR == res_con )
+	{
+		cout << "è¿æ¥å¤±è´¥..." << endl;
+	}
+	else
+	{
+		cout << "è¿æ¥æˆåŠŸ..." << endl;
+	}
+	thread th (thread_command,sock);
+	th.detach ();
+	while (is_run_client)
+	{
+		fd_set fds_read;
+		FD_ZERO ( &fds_read );
+		FD_SET ( sock , &fds_read );
+		timeval time_clock { 1 , 0 };
+		int res_sel = ( int ) select ( sock , &fds_read , nullptr , nullptr , &time_clock );
+		if (res_sel < 0)
+		{
+			cout << "ç³Ÿç³•ï¼Œselectå‡ºé”™" << endl;
+			break;
+		}
+		if (FD_ISSET(sock,&fds_read))
+		{
+			FD_CLR ( sock , &fds_read );
+			if (NO_RECEIVE == process_handle(sock))
+			{
+				cout << "ç³Ÿç³•ï¼Œselectå‡ºé”™1" << endl;
+				break;
+			}
+		}
+		//cout << "å®¢æˆ·ç«¯æ‰§è¡Œå…¶ä»–çš„ä»»åŠ¡" << endl;
+	}
 
+#ifdef _WIN32
+	closesocket ( sock );
+	WSACleanup ();
+#else
+	close(sock);
+#endif
+	return 0;
 }
-else if (0 == strcmp(_cmdMsg,"logout"))
-{
-LogOut _lgout;
-strcpy_s(_lgout.userName, "asus0420");
-//·¢ËÍÊı¾İ
-send(_sock, (const char *)&_lgout, sizeof(_lgout), 0);
-
-//½ÓÊÜ·şÎñÆ÷µÄ·µ»ØµÄÊı¾İ
-LogOutResult _lgoutRes = {};
-recv(_sock, (char *)&_lgoutRes, sizeof(_lgoutRes), 0);
-printf("½ÓÊÕµ½µÄÊı¾İ:%d  \n", _lgoutRes.result);
-}
-else
-{
-printf("¸ÃÃüÁî²»Ö§³Ö£¬ÇëÖØĞÂÊäÈë...\n");
-}
-*/
